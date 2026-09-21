@@ -1,0 +1,9 @@
+1. Decompresser ce ZIP.
+2. Ouvrir le dossier DNP_APPLI_IMPRIMANTE_PRET_GITHUB.
+3. Faire Ctrl+A.
+4. Dans GitHub : Add file > Upload files.
+5. GLISSER-DEPOSER toute la selection dans la page GitHub.
+6. Cliquer Commit changes.
+
+IMPORTANT : ne pas utiliser un bouton qui selectionne uniquement les fichiers et aplatit les dossiers.
+Le dossier .github doit rester un dossier, avec workflows/build-apk.yml dedans.

@@ -1,16 +1,7 @@
-# ZiGoBox Suite - Android APK + GitHub Actions
+# DNP APPLI IMPRIMANTE
 
-Ce depot contient :
-- la page Web ZiGoBox Suite ;
-- une application Android WebView ;
-- un workflow GitHub Actions qui genere automatiquement un APK.
+Le workflow `.github/workflows/build-apk.yml` construit automatiquement l'APK a chaque envoi sur `main` ou `master`.
 
-## APK
-Dans GitHub : Actions > Build APK > ouvrir la derniere execution verte > Artifacts > ZiGoBox-Suite-APK.
+APK : Actions > Build APK > derniere execution verte > Artifacts > DNP-APPLI-IMPRIMANTE-APK.
 
-## Adresse Web
-L'application charge par defaut :
-https://zigobox.github.io/ZiGoBox-Suite/
-
-Si le nom du depot GitHub Pages est different, modifier START_URL dans :
-app/src/main/java/fr/zigobox/suite/MainActivity.java
+Un APK direct est aussi publie dans Releases sous `apk-latest`.
