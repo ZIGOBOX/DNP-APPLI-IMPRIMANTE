@@ -1,1 +1,102 @@
-<!doctype html><html><body><h1>ZiGoBox Suite</h1></body></html>
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#111827" />
+  <meta name="description" content="Tableau de bord USB direct pour DNP DS-RX1HS sur Android / Chrome." />
+  <title>ZiGoBox • DNP RX1HS</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">ZiGoBox • contrôle imprimante</div>
+        <h1>DNP DS‑RX1HS</h1>
+      </div>
+      <div id="usbBadge" class="badge badge-off">USB déconnecté</div>
+    </header>
+
+    <section id="compatWarning" class="notice hidden" role="alert"></section>
+
+    <section class="hero card">
+      <div class="hero-copy">
+        <div class="hero-title">Connexion directe USB‑C / OTG</div>
+        <p>Branche l'imprimante au téléphone, allume-la, puis touche le bouton ci-dessous.</p>
+      </div>
+      <div class="actions">
+        <button id="connectBtn" class="btn btn-primary">Connecter la DNP</button>
+        <button id="refreshBtn" class="btn" disabled>Actualiser</button>
+        <button id="disconnectBtn" class="btn btn-ghost" disabled>Déconnecter</button>
+      </div>
+      <div id="message" class="message">Prêt.</div>
+    </section>
+
+    <section class="grid metrics" aria-live="polite">
+      <article class="card metric status-card">
+        <div class="label">État</div>
+        <div id="statusText" class="value status-value">—</div>
+        <div id="statusCode" class="sub">Code : —</div>
+      </article>
+
+      <article class="card metric">
+        <div class="label">Photos restantes</div>
+        <div id="remainingText" class="value">—</div>
+        <div id="remainingSub" class="sub">Valeur fournie par l'imprimante</div>
+        <div class="progress"><div id="remainingBar" class="progress-bar" style="width:0%"></div></div>
+      </article>
+
+      <article class="card metric">
+        <div class="label">Papier / ruban</div>
+        <div id="mediaStateText" class="value compact">—</div>
+        <div id="mediaStateSub" class="sub">La RX1HS utilise un kit papier + ruban</div>
+      </article>
+
+      <article class="card metric">
+        <div class="label">Média chargé</div>
+        <div id="mediaText" class="value compact">—</div>
+        <div id="mediaCode" class="sub">Code média : —</div>
+      </article>
+
+      <article class="card metric">
+        <div class="label">Compteur total</div>
+        <div id="lifeText" class="value">—</div>
+        <div class="sub">Compteur LIFE de l'imprimante</div>
+      </article>
+
+      <article class="card metric">
+        <div class="label">Dernière lecture</div>
+        <div id="lastUpdate" class="value compact">—</div>
+        <div class="sub">Actualisation automatique toutes les 10 s</div>
+      </article>
+    </section>
+
+    <section class="card details-card">
+      <h2>Informations imprimante</h2>
+      <div class="details-grid">
+        <div><span>Modèle</span><strong id="modelText">DS‑RX1HS</strong></div>
+        <div><span>N° de série</span><strong id="serialText">—</strong></div>
+        <div><span>Firmware</span><strong id="firmwareText">—</strong></div>
+        <div><span>Buffers libres</span><strong id="bufferText">—</strong></div>
+      </div>
+    </section>
+
+    <details class="card diagnostic-card">
+      <summary>Diagnostic USB / réponses brutes</summary>
+      <div class="diag-actions">
+        <button id="copyDiagBtn" class="btn btn-small">Copier le diagnostic</button>
+        <button id="clearDiagBtn" class="btn btn-small btn-ghost">Effacer</button>
+      </div>
+      <pre id="diagnostic">Aucun diagnostic pour le moment.</pre>
+    </details>
+
+    <footer>
+      <p>Prototype expérimental de lecture USB. Aucune commande d'impression ou de maintenance n'est envoyée : uniquement des requêtes d'information.</p>
+    </footer>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

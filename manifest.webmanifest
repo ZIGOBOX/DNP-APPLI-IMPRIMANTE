@@ -1,0 +1,10 @@
+{
+  "name": "ZiGoBox DNP RX1HS",
+  "short_name": "DNP RX1HS",
+  "description": "Contrôle USB direct de la DNP DS-RX1HS depuis Android.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#090d14",
+  "theme_color": "#111827"
+}

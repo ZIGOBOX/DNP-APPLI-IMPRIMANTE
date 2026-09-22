@@ -1,0 +1,16 @@
+DNP APK Android - prêt pour GitHub
+
+FICHIERS À ENVOYER À LA RACINE DU DÉPÔT :
+- index.html
+- style.css
+- app.js (version navigateur / GitHub Pages)
+- app-android.js (version intégrée dans l'APK)
+- manifest.webmanifest
+- sw.js
+
+IMPORTANT :
+Le fichier build-apk.yml doit être créé dans GitHub sous :
+.github/workflows/build-apk.yml
+
+Le workflow construit une APK autonome qui embarque l'interface et utilise
+Android UsbManager pour dialoguer avec une DNP DS-RX1/RX1HS (VID 1343 / PID 0005).

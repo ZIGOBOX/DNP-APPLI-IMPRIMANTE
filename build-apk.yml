@@ -1,38 +1,292 @@
 name: Build APK
 
 on:
-  push:
-    branches: [ "main", "master" ]
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "index.html"
+      - "style.css"
+      - "app-android.js"
+      - ".github/workflows/build-apk.yml"
+
+permissions:
+  contents: read
 
 jobs:
-  build:
+  build-apk:
     runs-on: ubuntu-latest
-
     steps:
       - name: Recuperer le depot
         uses: actions/checkout@v4
 
-      - name: Installer Java 17
+      - name: Installer Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
-
-      - name: Installer Android SDK
-        uses: android-actions/setup-android@v3
+          java-version: "17"
 
       - name: Installer Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.7'
+          gradle-version: "8.9"
 
-      - name: Construire APK debug
-        run: gradle assembleDebug --no-daemon
+      - name: Creer le projet Android
+        shell: bash
+        run: |
+          rm -rf android-build
+          mkdir -p android-build/app/src/main/java/fr/zigobox/dnp
+          mkdir -p android-build/app/src/main/assets
+
+          cp index.html style.css android-build/app/src/main/assets/
+          cp app-android.js android-build/app/src/main/assets/app.js
+
+          cat > android-build/settings.gradle <<'EOT'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.name = 'DNPAPPLIIMPRIMANTE'
+          include ':app'
+          EOT
+
+          cat > android-build/build.gradle <<'EOT'
+          plugins {
+              id 'com.android.application' version '8.7.3' apply false
+          }
+          EOT
+
+          cat > android-build/app/build.gradle <<'EOT'
+          plugins {
+              id 'com.android.application'
+          }
+          android {
+              namespace 'fr.zigobox.dnp'
+              compileSdk 35
+              defaultConfig {
+                  applicationId "fr.zigobox.dnp"
+                  minSdk 23
+                  targetSdk 35
+                  versionCode 2
+                  versionName "2.0"
+              }
+          }
+          EOT
+
+          cat > android-build/app/src/main/AndroidManifest.xml <<'EOT'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-feature android:name="android.hardware.usb.host" android:required="true" />
+              <application
+                  android:allowBackup="true"
+                  android:usesCleartextTraffic="false"
+                  android:label="DNP Imprimante"
+                  android:theme="@android:style/Theme.Material.Light.NoActionBar">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOT
+
+          cat > android-build/app/src/main/java/fr/zigobox/dnp/MainActivity.java <<'EOT'
+          package fr.zigobox.dnp;
+
+          import android.app.*;
+          import android.os.*;
+          import android.content.*;
+          import android.hardware.usb.*;
+          import android.webkit.*;
+          import android.widget.Toast;
+          import android.content.ClipData;
+          import android.content.ClipboardManager;
+          import java.nio.charset.StandardCharsets;
+          import java.util.*;
+
+          public class MainActivity extends Activity {
+              private static final int VENDOR_ID = 0x1343;
+              private static final int PRODUCT_ID = 0x0005;
+              private static final String ACTION_USB_PERMISSION = "fr.zigobox.dnp.USB_PERMISSION";
+
+              private WebView webView;
+              private UsbManager usbManager;
+              private UsbDevice device;
+              private UsbDeviceConnection connection;
+              private UsbInterface usbInterface;
+              private UsbEndpoint epIn, epOut;
+
+              private final BroadcastReceiver usbReceiver = new BroadcastReceiver() {
+                  @Override public void onReceive(Context context, Intent intent) {
+                      if (ACTION_USB_PERMISSION.equals(intent.getAction())) {
+                          UsbDevice d = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+                          if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false) && d != null) {
+                              openDevice(d);
+                              Toast.makeText(MainActivity.this, "Autorisation USB accordée", Toast.LENGTH_SHORT).show();
+                          }
+                      } else if (UsbManager.ACTION_USB_DEVICE_DETACHED.equals(intent.getAction())) {
+                          UsbDevice d = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+                          if (device != null && d != null && d.getDeviceId() == device.getDeviceId()) closeUsb();
+                      }
+                  }
+              };
+
+              @Override protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  usbManager = (UsbManager)getSystemService(Context.USB_SERVICE);
+
+                  IntentFilter filter = new IntentFilter();
+                  filter.addAction(ACTION_USB_PERMISSION);
+                  filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
+                  if (Build.VERSION.SDK_INT >= 33) registerReceiver(usbReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+                  else registerReceiver(usbReceiver, filter);
+
+                  webView = new WebView(this);
+                  setContentView(webView);
+                  WebSettings s = webView.getSettings();
+                  s.setJavaScriptEnabled(true);
+                  s.setDomStorageEnabled(true);
+                  s.setAllowFileAccess(true);
+                  webView.setWebViewClient(new WebViewClient());
+                  webView.setWebChromeClient(new WebChromeClient());
+                  webView.addJavascriptInterface(new UsbBridge(), "AndroidUsb");
+                  webView.loadUrl("file:///android_asset/index.html");
+              }
+
+              private UsbDevice findDnp() {
+                  for (UsbDevice d : usbManager.getDeviceList().values()) {
+                      if (d.getVendorId() == VENDOR_ID && d.getProductId() == PRODUCT_ID) return d;
+                  }
+                  return null;
+              }
+
+              private synchronized String openDevice(UsbDevice d) {
+                  closeUsb();
+                  UsbInterface foundIface = null;
+                  UsbEndpoint foundIn = null, foundOut = null;
+                  for (int i=0; i<d.getInterfaceCount(); i++) {
+                      UsbInterface iface = d.getInterface(i);
+                      UsbEndpoint in = null, out = null;
+                      for (int e=0; e<iface.getEndpointCount(); e++) {
+                          UsbEndpoint ep = iface.getEndpoint(e);
+                          if (ep.getType() == UsbConstants.USB_ENDPOINT_XFER_BULK) {
+                              if (ep.getDirection() == UsbConstants.USB_DIR_IN) in = ep;
+                              if (ep.getDirection() == UsbConstants.USB_DIR_OUT) out = ep;
+                          }
+                      }
+                      if (in != null && out != null) { foundIface=iface; foundIn=in; foundOut=out; break; }
+                  }
+                  if (foundIface == null) return "Aucune interface USB Bulk IN/OUT trouvée.";
+                  UsbDeviceConnection c = usbManager.openDevice(d);
+                  if (c == null) return "Impossible d’ouvrir le périphérique USB.";
+                  if (!c.claimInterface(foundIface, true)) { c.close(); return "Impossible de réserver l’interface USB."; }
+                  device=d; connection=c; usbInterface=foundIface; epIn=foundIn; epOut=foundOut;
+                  return "OK";
+              }
+
+              private synchronized void closeUsb() {
+                  try { if (connection != null && usbInterface != null) connection.releaseInterface(usbInterface); } catch(Exception ignored) {}
+                  try { if (connection != null) connection.close(); } catch(Exception ignored) {}
+                  connection=null; device=null; usbInterface=null; epIn=null; epOut=null;
+              }
+
+              private byte[] command(String group, String cmd) {
+                  byte[] b = new byte[32];
+                  Arrays.fill(b, (byte)0x20);
+                  b[0]=0x1b; b[1]=0x50;
+                  byte[] g=group.getBytes(StandardCharsets.US_ASCII);
+                  byte[] c=cmd.getBytes(StandardCharsets.US_ASCII);
+                  System.arraycopy(g,0,b,2,Math.min(6,g.length));
+                  System.arraycopy(c,0,b,8,Math.min(16,c.length));
+                  return b;
+              }
+
+              private String cleanAscii(byte[] b, int len) {
+                  String s = new String(b,0,len,StandardCharsets.US_ASCII);
+                  int cr=s.indexOf('\r'); if(cr>=0)s=s.substring(0,cr);
+                  return s.replace("\u0000","").trim();
+              }
+
+              private synchronized String queryUsb(String group, String cmd) {
+                  if (connection == null || epIn == null || epOut == null) return "__ERROR__:DNP non connectée";
+                  byte[] q=command(group,cmd);
+                  int sent=connection.bulkTransfer(epOut,q,q.length,3000);
+                  if(sent<0) return "__ERROR__:Échec d’envoi USB";
+                  byte[] header=new byte[8];
+                  int hn=connection.bulkTransfer(epIn,header,8,3000);
+                  if(hn<=0) return "__ERROR__:Aucune réponse USB";
+                  String hs=cleanAscii(header,hn).trim();
+                  int length;
+                  try { length=Integer.parseInt(hs); } catch(Exception e) { return "__ERROR__:Longueur de réponse invalide: "+hs; }
+                  if(length<0 || length>65536) return "__ERROR__:Longueur de réponse invalide";
+                  if(length==0) return "";
+                  byte[] payload=new byte[length]; int total=0;
+                  while(total<length) {
+                      byte[] tmp=new byte[length-total];
+                      int n=connection.bulkTransfer(epIn,tmp,tmp.length,3000);
+                      if(n<=0) return "__ERROR__:Réponse USB incomplète "+total+"/"+length;
+                      System.arraycopy(tmp,0,payload,total,n); total+=n;
+                  }
+                  return cleanAscii(payload,total);
+              }
+
+              public class UsbBridge {
+                  @JavascriptInterface public String connect() {
+                      UsbDevice d=findDnp();
+                      if(d==null) return "DNP RX1HS non trouvée. Vérifie le câble USB/OTG.";
+                      if(!usbManager.hasPermission(d)) {
+                          PendingIntent pi=PendingIntent.getBroadcast(MainActivity.this,0,new Intent(ACTION_USB_PERMISSION),
+                              Build.VERSION.SDK_INT>=31 ? PendingIntent.FLAG_MUTABLE : 0);
+                          usbManager.requestPermission(d,pi);
+                          return "PERMISSION_REQUESTED";
+                      }
+                      return openDevice(d);
+                  }
+                  @JavascriptInterface public String query(String group,String cmd) { return queryUsb(group,cmd); }
+                  @JavascriptInterface public void disconnect() { closeUsb(); }
+                  @JavascriptInterface public void copyText(String text) {
+                      runOnUiThread(() -> {
+                          ClipboardManager cm=(ClipboardManager)getSystemService(Context.CLIPBOARD_SERVICE);
+                          cm.setPrimaryClip(ClipData.newPlainText("Diagnostic DNP",text));
+                      });
+                  }
+              }
+
+              @Override protected void onDestroy() {
+                  closeUsb();
+                  try { unregisterReceiver(usbReceiver); } catch(Exception ignored) {}
+                  super.onDestroy();
+              }
+          }
+          EOT
+
+      - name: Fabriquer APK
+        working-directory: android-build
+        run: gradle :app:assembleDebug --no-daemon
+
+      - name: Preparer APK
+        run: |
+          mkdir -p dist
+          cp android-build/app/build/outputs/apk/debug/app-debug.apk dist/DNP-IMPRIMANTE.apk
 
       - name: Publier APK dans Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ZiGoBox-Suite-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: DNP-IMPRIMANTE-APK
+          path: dist/DNP-IMPRIMANTE.apk
           if-no-files-found: error
+          retention-days: 30
