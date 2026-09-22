@@ -1,0 +1,162 @@
+name: Build APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "index.html"
+      - "config.json"
+      - ".github/workflows/build-apk.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Recuperer le depot
+        uses: actions/checkout@v4
+
+      - name: Installer Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Installer Android
+        uses: android-actions/setup-android@v3
+
+      - name: Installer Android SDK 35
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Installer Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Creer automatiquement le projet Android
+        shell: bash
+        run: |
+          rm -rf app
+          mkdir -p app/src/main/java/fr/zigobox/dnp
+
+          cat > settings.gradle <<'EOT'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          rootProject.name = 'DNPAPPLIIMPRIMANTE'
+          include ':app'
+          EOT
+
+          cat > build.gradle <<'EOT'
+          plugins {
+              id 'com.android.application' version '8.7.3' apply false
+          }
+          EOT
+
+          cat > app/build.gradle <<'EOT'
+          plugins {
+              id 'com.android.application'
+          }
+
+          android {
+              namespace 'fr.zigobox.dnp'
+              compileSdk 35
+
+              defaultConfig {
+                  applicationId "fr.zigobox.dnp"
+                  minSdk 23
+                  targetSdk 35
+                  versionCode 1
+                  versionName "1.0"
+              }
+          }
+          EOT
+
+          cat > app/src/main/AndroidManifest.xml <<'EOT'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET" />
+              <application
+                  android:allowBackup="true"
+                  android:label="DNP Imprimante"
+                  android:theme="@android:style/Theme.Material.Light.NoActionBar">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOT
+
+          cat > app/src/main/java/fr/zigobox/dnp/MainActivity.java <<'EOT'
+          package fr.zigobox.dnp;
+
+          import android.app.Activity;
+          import android.os.Bundle;
+          import android.webkit.WebChromeClient;
+          import android.webkit.WebSettings;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+
+          public class MainActivity extends Activity {
+              private WebView webView;
+
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+
+                  webView = new WebView(this);
+                  setContentView(webView);
+
+                  WebSettings settings = webView.getSettings();
+                  settings.setJavaScriptEnabled(true);
+                  settings.setDomStorageEnabled(true);
+                  settings.setLoadWithOverviewMode(true);
+                  settings.setUseWideViewPort(true);
+                  settings.setBuiltInZoomControls(false);
+
+                  webView.setWebViewClient(new WebViewClient());
+                  webView.setWebChromeClient(new WebChromeClient());
+                  webView.loadUrl("https://zigobox.github.io/DNP-APPLI-IMPRIMANTE/");
+              }
+
+              @Override
+              public void onBackPressed() {
+                  if (webView != null && webView.canGoBack()) {
+                      webView.goBack();
+                  } else {
+                      super.onBackPressed();
+                  }
+              }
+          }
+          EOT
+
+      - name: Fabriquer APK
+        run: gradle :app:assembleDebug --no-daemon
+
+      - name: Renommer APK
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/app-debug.apk dist/DNP-APPLI-IMPRIMANTE.apk
+
+      - name: Publier APK dans Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: DNP-APPLI-IMPRIMANTE-APK
+          path: dist/DNP-APPLI-IMPRIMANTE.apk
+          if-no-files-found: error
+          retention-days: 30
