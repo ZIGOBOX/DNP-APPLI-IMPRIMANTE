@@ -40,23 +40,23 @@ jobs:
 
           cat > settings.gradle <<'EOT'
           pluginManagement {
-    repositories {
-        google()
-        mavenCentral()
-        gradlePluginPortal()
-    }
-}
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
 
-dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-    repositories {
-        google()
-        mavenCentral()
-    }
-}
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
 
-rootProject.name = 'DNPAPPLIIMPRIMANTE'
-include ':app'
+          rootProject.name = 'DNPAPPLIIMPRIMANTE'
+          include ':app'
           EOT
 
           cat > build.gradle <<'EOT'
@@ -88,17 +88,21 @@ include ':app'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.INTERNET" />
+
               <application
                   android:allowBackup="true"
                   android:label="DNP Imprimante"
                   android:theme="@android:style/Theme.Material.Light.NoActionBar">
+
                   <activity
                       android:name=".MainActivity"
                       android:exported="true">
+
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN" />
                           <category android:name="android.intent.category.LAUNCHER" />
                       </intent-filter>
+
                   </activity>
               </application>
           </manifest>
@@ -115,6 +119,7 @@ include ':app'
           import android.webkit.WebViewClient;
 
           public class MainActivity extends Activity {
+
               private WebView webView;
 
               @Override
@@ -129,11 +134,13 @@ include ':app'
                   settings.setDomStorageEnabled(true);
                   settings.setLoadWithOverviewMode(true);
                   settings.setUseWideViewPort(true);
-                  settings.setBuiltInZoomControls(false);
 
                   webView.setWebViewClient(new WebViewClient());
                   webView.setWebChromeClient(new WebChromeClient());
-                  webView.loadUrl("https://zigobox.github.io/DNP-APPLI-IMPRIMANTE/");
+
+                  webView.loadUrl(
+                      "https://zigobox.github.io/DNP-APPLI-IMPRIMANTE/"
+                  );
               }
 
               @Override
@@ -151,10 +158,10 @@ include ':app'
         run: gradle :app:assembleDebug --no-daemon
 
       - name: Renommer APK
-        shell: bash
         run: |
           mkdir -p dist
-          cp app/build/outputs/apk/debug/app-debug.apk dist/DNP-APPLI-IMPRIMANTE.apk
+          cp app/build/outputs/apk/debug/app-debug.apk \
+             dist/DNP-APPLI-IMPRIMANTE.apk
 
       - name: Publier APK dans Artifacts
         uses: actions/upload-artifact@v4
